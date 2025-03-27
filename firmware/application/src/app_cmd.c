@@ -15,6 +15,7 @@
 #include "settings.h"
 #include "delayed_reset.h"
 #include "netdata.h"
+#include "lf_tag_hidprox.h"
 
 
 #define NRF_LOG_MODULE_NAME app_cmd
@@ -23,6 +24,10 @@
 #include "nrf_log_default_backends.h"
 NRF_LOG_MODULE_REGISTER();
 
+static data_frame_tx_t *cmd_processor_hidprox_set_emu_id(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data);
+static data_frame_tx_t *cmd_processor_hidprox_get_emu_id(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data);
+static data_frame_tx_t *cmd_processor_hidprox_decode(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data);
+static data_frame_tx_t *cmd_processor_hidprox_encode(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data);
 
 static void change_slot_auto(uint8_t slot) {
     device_mode_t mode = get_device_mode();
@@ -1334,6 +1339,11 @@ static cmd_data_map_t m_data_cmd_map[] = {
 
     {    DATA_CMD_EM410X_SET_EMU_ID,            NULL,                        cmd_processor_em410x_set_emu_id,             NULL                   },
     {    DATA_CMD_EM410X_GET_EMU_ID,            NULL,                        cmd_processor_em410x_get_emu_id,             NULL                   },
+    
+    {    DATA_CMD_HIDPROX_SET_EMU_ID,           NULL,                        cmd_processor_hidprox_set_emu_id,            NULL                   },
+    {    DATA_CMD_HIDPROX_GET_EMU_ID,           NULL,                        cmd_processor_hidprox_get_emu_id,            NULL                   },
+    {    DATA_CMD_HIDPROX_DECODE,               NULL,                        cmd_processor_hidprox_decode,                NULL                   },
+    {    DATA_CMD_HIDPROX_ENCODE,               NULL,                        cmd_processor_hidprox_encode,                NULL                   },
 };
 
 data_frame_tx_t *cmd_processor_get_device_capabilities(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
@@ -1405,4 +1415,109 @@ void on_data_frame_received(uint16_t cmd, uint16_t status, uint16_t length, uint
         auto_response_data(response);
         NRF_LOG_INFO("Data frame cmd invalid: %d,", cmd);
     }
+}
+
+/**
+ * @brief Command handler for setting HID Corporate 1000 emulation ID
+ * @param cmd: command code
+ * @param status: status value
+ * @param length: data length
+ * @param data: data buffer containing company code and card number
+ * @return Response data frame
+ */
+ static data_frame_tx_t *cmd_processor_hidprox_set_emu_id(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
+    if (length != LF_HIDPROX_TAG_DATA_SIZE) {
+        return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
+    }
+    
+    tag_data_buffer_t *buffer = get_buffer_by_tag_type(TAG_TYPE_HID_CORPORATE_1000);
+    memcpy(buffer->buffer, data, LF_HIDPROX_TAG_DATA_SIZE);
+    tag_emulation_load_by_buffer(TAG_TYPE_HID_CORPORATE_1000, false);
+    return data_frame_make(cmd, STATUS_SUCCESS, 0, NULL);
+}
+
+/**
+ * @brief Command handler for getting HID Corporate 1000 emulation ID
+ * @param cmd: command code
+ * @param status: status value
+ * @param length: data length
+ * @param data: data buffer
+ * @return Response data frame with HID Corporate 1000 ID
+ */
+static data_frame_tx_t *cmd_processor_hidprox_get_emu_id(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
+    tag_slot_specific_type_t tag_types;
+    tag_emulation_get_specific_types_by_slot(tag_emulation_get_slot(), &tag_types);
+    if (tag_types.tag_lf != TAG_TYPE_HID_CORPORATE_1000) {
+        return data_frame_make(cmd, STATUS_PAR_ERR, 0, data); // no data in slot, don't send garbage
+    }
+    
+    tag_data_buffer_t *buffer = get_buffer_by_tag_type(TAG_TYPE_HID_CORPORATE_1000);
+    uint8_t responseData[LF_HIDPROX_TAG_DATA_SIZE];
+    memcpy(responseData, buffer->buffer, LF_HIDPROX_TAG_DATA_SIZE);
+    return data_frame_make(cmd, STATUS_SUCCESS, LF_HIDPROX_TAG_DATA_SIZE, responseData);
+}
+
+/**
+ * @brief Command handler to decode HID Corporate 1000 data into human-readable form
+ * @param cmd: command code
+ * @param status: status value
+ * @param length: data length
+ * @param data: data buffer
+ * @return Response data frame with decoded HID Corporate 1000 data
+ */
+static data_frame_tx_t *cmd_processor_hidprox_decode(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
+    if (length != LF_HIDPROX_TAG_DATA_SIZE) {
+        return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
+    }
+    
+    // Extract company code and card number from binary data
+    uint16_t company_code = ((uint16_t)data[0] << 4) | ((data[1] & 0xF0) >> 4);
+    uint32_t card_number = ((uint32_t)(data[1] & 0x0F) << 16) | ((uint32_t)data[2] << 8) | data[3];
+    
+    // Format response data with decoded values
+    struct {
+        uint16_t company_code;
+        uint32_t card_number;
+    } PACKED response_data;
+    
+    response_data.company_code = U16HTONS(company_code);
+    response_data.card_number = U32HTONL(card_number);
+    
+    return data_frame_make(cmd, STATUS_SUCCESS, sizeof(response_data), (uint8_t *)&response_data);
+}
+
+/**
+ * @brief Command handler to encode human-readable HID values into binary format
+ * @param cmd: command code
+ * @param status: status value
+ * @param length: data length
+ * @param data: data buffer containing company code and card number
+ * @return Response data frame with encoded HID Corporate 1000 data
+ */
+static data_frame_tx_t *cmd_processor_hidprox_encode(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
+    if (length != 6) { // uint16_t company_code + uint32_t card_number
+        return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
+    }
+    
+    // Extract values from input data
+    uint16_t company_code = U16NTOHS(*(uint16_t *)data);
+    uint32_t card_number = U32NTOHL(*(uint32_t *)(data + 2));
+    
+    // Check bounds
+    if (company_code > 0xFFF) { // 12-bit max
+        return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
+    }
+    
+    if (card_number > 0x7FFFF) { // 19-bit max
+        return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
+    }
+    
+    // Encode into binary format
+    uint8_t encoded_data[LF_HIDPROX_TAG_DATA_SIZE];
+    encoded_data[0] = (company_code >> 4) & 0xFF;
+    encoded_data[1] = ((company_code & 0x0F) << 4) | ((card_number >> 16) & 0x0F);
+    encoded_data[2] = (card_number >> 8) & 0xFF;
+    encoded_data[3] = card_number & 0xFF;
+    
+    return data_frame_make(cmd, STATUS_SUCCESS, LF_HIDPROX_TAG_DATA_SIZE, encoded_data);
 }

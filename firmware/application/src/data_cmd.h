@@ -133,4 +133,14 @@
 #define DATA_CMD_EM410X_SET_EMU_ID              (5000)
 #define DATA_CMD_EM410X_GET_EMU_ID              (5001)
 
+
+// ******************************************************************
+//                      CMD for HID Prox
+//                  Range from 5000 -> 5999
+// ******************************************************************
+#define DATA_CMD_HIDPROX_SET_EMU_ID            (5002)
+#define DATA_CMD_HIDPROX_GET_EMU_ID            (5003)
+#define DATA_CMD_HIDPROX_DECODE                (5004)
+#define DATA_CMD_HIDPROX_ENCODE                (5005)
+
 #endif

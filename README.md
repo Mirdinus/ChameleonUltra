@@ -59,3 +59,7 @@ Where do you find the community?
 * [RFID Hacking community discord server](https://t.ly/d4_C)
   * Software/chameleon-dev for firmware and clients development discussions
   * Devices/chameleon-ultra for usage discussions
+
+
+
+docker run --rm -v ./:/workdir -e CURRENT_DEVICE_TYPE=ultra ch ./firmware/build.sh
