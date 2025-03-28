@@ -1,7 +1,6 @@
 #include "crc_utils.h"
 #include "nfc_14a.h"
 #include "lf_tag_em.h"
-#include "lf_tag_hidprox.h"
 #include "nfc_mf1.h"
 #include "nfc_mf0_ntag.h"
 #include "fds_ids.h"
@@ -95,8 +94,6 @@ static uint16_t m_slot_config_crc;
 static tag_base_handler_map_t tag_base_map[] = {
     // Low -frequency ID card simulation
     { TAG_SENSE_LF,    TAG_TYPE_EM410X,         lf_tag_em410x_data_loadcb,    lf_tag_em410x_data_savecb,    lf_tag_em410x_data_factory,    &m_tag_data_lf },
-    // HID Corporate 1000 simulation
-    { TAG_SENSE_LF,    TAG_TYPE_HID_CORPORATE_1000, lf_tag_hidprox_data_loadcb, lf_tag_hidprox_data_savecb,  lf_tag_hidprox_data_factory,  &m_tag_data_lf },
     // MF1 tag simulation
     { TAG_SENSE_HF,    TAG_TYPE_MIFARE_Mini,    nfc_tag_mf1_data_loadcb,      nfc_tag_mf1_data_savecb,      nfc_tag_mf1_data_factory,      &m_tag_data_hf },
     { TAG_SENSE_HF,    TAG_TYPE_MIFARE_1024,    nfc_tag_mf1_data_loadcb,      nfc_tag_mf1_data_savecb,      nfc_tag_mf1_data_factory,      &m_tag_data_hf },
@@ -397,9 +394,9 @@ static void tag_emulation_sense_switch_all(bool enable) {
  * @param type: Field sensor type
  * @param enable: Whether to enable this type of field induction
  */
- void tag_emulation_sense_switch(tag_sense_type_t type, bool enable) {
+void tag_emulation_sense_switch(tag_sense_type_t type, bool enable) {
     uint8_t slot = tag_emulation_get_slot();
-    // Check the parameters, not allowed to switch non-normal field
+    // Check the parameters, not allowed to switch non -normal field
     switch (type) {
         case TAG_SENSE_NO:
             APP_ERROR_CHECK(NRF_ERROR_INVALID_PARAM);
@@ -415,17 +412,9 @@ static void tag_emulation_sense_switch_all(bool enable) {
         case TAG_SENSE_LF:
             if (enable && (slotConfig.slots[slot].enabled_lf) &&
                     (slotConfig.slots[slot].tag_lf != TAG_TYPE_UNDEFINED)) {
-                // Select the appropriate LF tag handler based on tag type
-                if (slotConfig.slots[slot].tag_lf == TAG_TYPE_HID_CORPORATE_1000) {
-                    lf_tag_hidprox_sense_switch(true);
-                } else {
-                    // Default to EM410X for all other LF tags
-                    lf_tag_125khz_sense_switch(true);
-                }
+                lf_tag_125khz_sense_switch(true);
             } else {
-                // Disable all LF sensing
                 lf_tag_125khz_sense_switch(false);
-                lf_tag_hidprox_sense_switch(false);
             }
             break;
     }
@@ -702,9 +691,9 @@ void tag_emulation_change_type(uint8_t slot, tag_specific_type_t tag_type) {
 void tag_emulation_factory_init(void) {
     fds_slot_record_map_t map_info;
 
-    // Initialize a dual-frequency card in the card slot, if there is no historical record, it is a new state of factory.
+    // Initialized a dual -frequency card in the card slot, if there is no historical record, it is a new state of factory.
     if (slotConfig.slots[0].enabled_hf && slotConfig.slots[0].tag_hf == TAG_TYPE_MIFARE_1024) {
-        // Initialize a high-frequency M1 card in the card slot 1, if it does not exist.
+        // Initialize a high -frequency M1 card in the card slot 1, if it does not exist.
         get_fds_map_by_slot_sense_type_for_dump(0, TAG_SENSE_HF, &map_info);
         if (!fds_is_exists(map_info.id, map_info.key)) {
             tag_emulation_factory_data(0, slotConfig.slots[0].tag_hf);
@@ -712,7 +701,7 @@ void tag_emulation_factory_init(void) {
     }
 
     if (slotConfig.slots[0].enabled_lf && slotConfig.slots[0].tag_lf == TAG_TYPE_EM410X) {
-        // Initialize a low-frequency EM410X card in slot 1, if it does not exist.
+        // Initialize a low -frequency EM410X card in slot 1, if it does not exist.
         get_fds_map_by_slot_sense_type_for_dump(0, TAG_SENSE_LF, &map_info);
         if (!fds_is_exists(map_info.id, map_info.key)) {
             tag_emulation_factory_data(0, slotConfig.slots[0].tag_lf);
@@ -720,7 +709,7 @@ void tag_emulation_factory_init(void) {
     }
 
     if (slotConfig.slots[1].enabled_hf && slotConfig.slots[1].tag_hf == TAG_TYPE_MF0ICU1) {
-        // Initialize a high-frequency M1 card in the card slot 2, if it does not exist.
+        // Initialize a high -frequency M1 card in the card slot 2, if it does not exist.
         get_fds_map_by_slot_sense_type_for_dump(1, TAG_SENSE_HF, &map_info);
         if (!fds_is_exists(map_info.id, map_info.key)) {
             tag_emulation_factory_data(1, slotConfig.slots[1].tag_hf);
@@ -728,18 +717,10 @@ void tag_emulation_factory_init(void) {
     }
 
     if (slotConfig.slots[2].enabled_lf && slotConfig.slots[2].tag_lf == TAG_TYPE_EM410X) {
-        // Initialize a low-frequency EM410X card in slot 3, if it does not exist.
+        // Initialize a low -frequency EM410X card in slot 3, if it does not exist.
         get_fds_map_by_slot_sense_type_for_dump(2, TAG_SENSE_LF, &map_info);
         if (!fds_is_exists(map_info.id, map_info.key)) {
             tag_emulation_factory_data(2, slotConfig.slots[2].tag_lf);
-        }
-    }
-    
-    // Add a HID Corporate 1000 card to slot 3 if it doesn't already exist
-    if (slotConfig.slots[3].enabled_lf && slotConfig.slots[3].tag_lf == TAG_TYPE_HID_CORPORATE_1000) {
-        get_fds_map_by_slot_sense_type_for_dump(3, TAG_SENSE_LF, &map_info);
-        if (!fds_is_exists(map_info.id, map_info.key)) {
-            tag_emulation_factory_data(3, slotConfig.slots[3].tag_lf);
         }
     }
 }

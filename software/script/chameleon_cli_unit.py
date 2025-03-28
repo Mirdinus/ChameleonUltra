@@ -420,6 +420,8 @@ lf = root.subgroup('lf', 'Low Frequency commands')
 lf_em = lf.subgroup('em', 'EM commands')
 lf_em_410x = lf_em.subgroup('410x', 'EM410x commands')
 
+# Add HID Prox command group
+hidprox = root.add_child('hidprox', 'HID Prox commands')
 
 @root.command('clear')
 class RootClear(BaseCLIUnit):
@@ -3121,3 +3123,141 @@ examples/notes:
             )
         else:
             print(F" [*] {CY}No response{C0}")
+
+@hidprox.command('read')
+class HIDProxRead(ReaderRequiredUnit):
+    """Read HID Prox card data"""
+    def args_parser(self) -> ArgumentParserNoExit:
+        parser = ArgumentParserNoExit()
+        return parser
+
+    def on_exec(self, args: argparse.Namespace):
+        # Send HID Prox read command
+        response = self.cmd.send_cmd(chameleon_cmd.Command.DATA_CMD_HIDPROX_READ)
+        
+        if response.status == Status.STATUS_SUCCESS:
+            # Parse response data
+            company_code = int.from_bytes(response.data[0:2], 'little')
+            card_number = int.from_bytes(response.data[2:6], 'little')
+            raw_data = response.data[6:11]
+            
+            print(f"{CG}HID Prox card detected:{C0}")
+            print(f"Company Code: {company_code}")
+            print(f"Card Number: {card_number}")
+            print(f"Raw Data: {raw_data.hex()}")
+        else:
+            print(f"{CR}No HID Prox card detected{C0}")
+
+@hidprox.command('decode')
+class HIDProxDecode(DeviceRequiredUnit):
+    """Decode HID Prox raw data"""
+    def args_parser(self) -> ArgumentParserNoExit:
+        parser = ArgumentParserNoExit()
+        parser.add_argument('raw_data', type=str, help='Raw HID Prox data (5 bytes in hex)')
+        return parser
+
+    def on_exec(self, args: argparse.Namespace):
+        try:
+            # Convert hex string to bytes
+            raw_data = bytes.fromhex(args.raw_data)
+            if len(raw_data) != 5:
+                raise ValueError("Raw data must be 5 bytes")
+            
+            # Send decode command
+            response = self.cmd.send_cmd(chameleon_cmd.Command.DATA_CMD_HIDPROX_DECODE, raw_data)
+            
+            if response.status == Status.STATUS_SUCCESS:
+                company_code = int.from_bytes(response.data[0:2], 'little')
+                card_number = int.from_bytes(response.data[2:6], 'little')
+                
+                print(f"{CG}Decoded HID Prox data:{C0}")
+                print(f"Company Code: {company_code}")
+                print(f"Card Number: {card_number}")
+            else:
+                print(f"{CR}Failed to decode HID Prox data{C0}")
+        except ValueError as e:
+            print(f"{CR}Error: {str(e)}{C0}")
+
+@hidprox.command('encode')
+class HIDProxEncode(DeviceRequiredUnit):
+    """Encode HID Prox data to raw format"""
+    def args_parser(self) -> ArgumentParserNoExit:
+        parser = ArgumentParserNoExit()
+        parser.add_argument('company_code', type=int, help='Company code (12 bits)')
+        parser.add_argument('card_number', type=int, help='Card number (19 bits)')
+        return parser
+
+    def on_exec(self, args: argparse.Namespace):
+        # Validate input
+        if not (0 <= args.company_code <= 0xFFF):
+            print(f"{CR}Error: Company code must be between 0 and 4095 (12 bits){C0}")
+            return
+        if not (0 <= args.card_number <= 0x7FFFF):
+            print(f"{CR}Error: Card number must be between 0 and 524287 (19 bits){C0}")
+            return
+        
+        # Prepare data
+        data = bytearray()
+        data.extend(args.company_code.to_bytes(2, 'little'))
+        data.extend(args.card_number.to_bytes(4, 'little'))
+        
+        # Send encode command
+        response = self.cmd.send_cmd(chameleon_cmd.Command.DATA_CMD_HIDPROX_ENCODE, data)
+        
+        if response.status == Status.STATUS_SUCCESS:
+            print(f"{CG}Encoded HID Prox data:{C0}")
+            print(f"Raw Data: {response.data.hex()}")
+        else:
+            print(f"{CR}Failed to encode HID Prox data{C0}")
+
+@hidprox.command('set_emu')
+class HIDProxSetEmu(DeviceRequiredUnit):
+    """Set HID Prox emulation data"""
+    def args_parser(self) -> ArgumentParserNoExit:
+        parser = ArgumentParserNoExit()
+        parser.add_argument('company_code', type=int, help='Company code (12 bits)')
+        parser.add_argument('card_number', type=int, help='Card number (19 bits)')
+        return parser
+
+    def on_exec(self, args: argparse.Namespace):
+        # Validate input
+        if not (0 <= args.company_code <= 0xFFF):
+            print(f"{CR}Error: Company code must be between 0 and 4095 (12 bits){C0}")
+            return
+        if not (0 <= args.card_number <= 0x7FFFF):
+            print(f"{CR}Error: Card number must be between 0 and 524287 (19 bits){C0}")
+            return
+        
+        # Prepare data
+        data = bytearray()
+        data.extend(args.company_code.to_bytes(2, 'little'))
+        data.extend(args.card_number.to_bytes(4, 'little'))
+        
+        # Send set emulation command
+        response = self.cmd.send_cmd(chameleon_cmd.Command.DATA_CMD_HIDPROX_SET_EMU_ID, data)
+        
+        if response.status == Status.STATUS_SUCCESS:
+            print(f"{CG}HID Prox emulation data set successfully{C0}")
+        else:
+            print(f"{CR}Failed to set HID Prox emulation data{C0}")
+
+@hidprox.command('get_emu')
+class HIDProxGetEmu(DeviceRequiredUnit):
+    """Get current HID Prox emulation data"""
+    def args_parser(self) -> ArgumentParserNoExit:
+        parser = ArgumentParserNoExit()
+        return parser
+
+    def on_exec(self, args: argparse.Namespace):
+        # Send get emulation command
+        response = self.cmd.send_cmd(chameleon_cmd.Command.DATA_CMD_HIDPROX_GET_EMU_ID)
+        
+        if response.status == Status.STATUS_SUCCESS:
+            company_code = int.from_bytes(response.data[0:2], 'little')
+            card_number = int.from_bytes(response.data[2:6], 'little')
+            
+            print(f"{CG}Current HID Prox emulation data:{C0}")
+            print(f"Company Code: {company_code}")
+            print(f"Card Number: {card_number}")
+        else:
+            print(f"{CR}Failed to get HID Prox emulation data{C0}")

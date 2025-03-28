@@ -27,24 +27,6 @@ uint8_t PcdScanEM410X(uint8_t *uid) {
 }
 
 /**
- * @brief Search for HID Prox cards
- * 
- * @param card_data Pointer to store the card data
- * @return uint8_t STATUS_LF_TAG_OK if successful, otherwise error code
- */
-uint8_t PcdScanHIDProx(hidprox_card_data_t *card_data) {
-    uint8_t ret = STATUS_HF_TAG_NO;
-    
-    if (hidprox_read(card_data, g_timeout_readem_ms) == 1) {
-        ret = STATUS_LF_TAG_OK;
-        NRF_LOG_INFO("HID Corporate 1000 card found: Company Code %u, Card Number %u", 
-                     card_data->company_code, card_data->card_number);
-    }
-    
-    return ret;
-}
-
-/**
 * Check whether there is a specified UID tag on the current field
 */
 uint8_t check_write_ok(uint8_t *uid, uint8_t *newuid, uint8_t on_uid_diff_return) {

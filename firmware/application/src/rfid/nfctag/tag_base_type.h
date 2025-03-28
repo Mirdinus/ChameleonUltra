@@ -49,7 +49,6 @@ typedef enum {
 
     //////// FSK Tag-Talk-First   200
     // HID Prox
-    TAG_TYPE_HID_CORPORATE_1000 = 200,
     // ioProx
     // AWID
     // Paradox

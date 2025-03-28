@@ -111,6 +111,13 @@ class Command(enum.IntEnum):
     EM410X_SET_EMU_ID = 5000
     EM410X_GET_EMU_ID = 5001
 
+    # HID Prox Reader Commands (1100-1199)
+    DATA_CMD_HIDPROX_READ = 1100
+    DATA_CMD_HIDPROX_SET_EMU_ID = 1101
+    DATA_CMD_HIDPROX_GET_EMU_ID = 1102
+    DATA_CMD_HIDPROX_DECODE = 1103
+    DATA_CMD_HIDPROX_ENCODE = 1104
+
 
 @enum.unique
 class Status(enum.IntEnum):
