@@ -23,6 +23,7 @@
 #include "nrf_log_default_backends.h"
 NRF_LOG_MODULE_REGISTER();
 
+
 static void change_slot_auto(uint8_t slot) {
     device_mode_t mode = get_device_mode();
     tag_emulation_change_slot(slot, mode != DEVICE_MODE_READER);
@@ -523,47 +524,13 @@ static data_frame_tx_t *cmd_processor_em410x_scan(uint16_t cmd, uint16_t status,
     return data_frame_make(cmd, STATUS_LF_TAG_OK, sizeof(id_buffer), id_buffer);
 }
 
-
-/**
- * @brief Command handler for HID Prox card reading (CMD 1100)
- */
-static data_frame_tx_t *cmd_processor_hidprox_read(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
-    hidprox_card_data_t card_data;
-    uint8_t ret;
-
-    // Switch to reader mode if not already in it
-    if (get_device_mode() != DEVICE_MODE_READER) {
-        reader_mode_enter();
+static data_frame_tx_t *cmd_processor_hidprox_scan(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
+    uint8_t id_buffer[5] = { 0x00 };
+    status = PcdScanHIDProx(id_buffer);
+    if (status != STATUS_LF_TAG_OK) {
+        return data_frame_make(cmd, status, 0, NULL);
     }
-
-    // Initialize HID Prox hardware
-    init_hidprox_hw();
-
-    // Try to read a card
-    ret = PcdScanHIDProx(&card_data);
-
-    // Cleanup
-    stop_hidprox_reader();
-    cleanup_hidprox_hw();
-
-    if (ret == STATUS_LF_TAG_OK) {
-        // Prepare response data: company code (2 bytes) + card number (4 bytes) + raw data (5 bytes)
-        uint8_t response[11];
-        response[0] = card_data.company_code & 0xFF;
-        response[1] = (card_data.company_code >> 8) & 0xFF;
-        response[2] = card_data.card_number & 0xFF;
-        response[3] = (card_data.card_number >> 8) & 0xFF;
-        response[4] = (card_data.card_number >> 16) & 0xFF;
-        response[5] = (card_data.card_number >> 24) & 0xFF;
-        memcpy(response + 6, card_data.raw_data, 5);
-        
-
-        NRF_LOG_INFO("HID Prox Read: Company Code: %04X, Card Number: %08X", card_data.company_code, card_data.card_number);
-
-        return data_frame_make(cmd, STATUS_SUCCESS, sizeof(response), response);
-    }
-
-    return data_frame_make(cmd, STATUS_HF_TAG_NO, 0, NULL);
+    return data_frame_make(cmd, STATUS_LF_TAG_OK, sizeof(id_buffer), id_buffer);
 }
 
 static data_frame_tx_t *cmd_processor_em410x_write_to_t55XX(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
@@ -1340,6 +1307,7 @@ static cmd_data_map_t m_data_cmd_map[] = {
 
     {    DATA_CMD_EM410X_SCAN,                  before_reader_run,           cmd_processor_em410x_scan,                   NULL                   },
     {    DATA_CMD_EM410X_WRITE_TO_T55XX,        before_reader_run,           cmd_processor_em410x_write_to_t55XX,         NULL                   },
+    {    DATA_CMD_HIDPROX_SCAN,                 before_reader_run,           cmd_processor_hidprox_scan,                  NULL                   },
 
 #endif
 
@@ -1376,7 +1344,6 @@ static cmd_data_map_t m_data_cmd_map[] = {
 
     {    DATA_CMD_EM410X_SET_EMU_ID,            NULL,                        cmd_processor_em410x_set_emu_id,             NULL                   },
     {    DATA_CMD_EM410X_GET_EMU_ID,            NULL,                        cmd_processor_em410x_get_emu_id,             NULL                   },
-    {    DATA_CMD_HIDPROX_READ,                 NULL,                        cmd_processor_hidprox_read,                  NULL                   },
 };
 
 data_frame_tx_t *cmd_processor_get_device_capabilities(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {

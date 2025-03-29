@@ -27,6 +27,17 @@ uint8_t PcdScanEM410X(uint8_t *uid) {
 }
 
 /**
+ * Search HID Prox tag
+*/
+uint8_t PcdScanHIDProx(uint8_t *uid) {
+    uint8_t ret = STATUS_HIDPROX_TAG_NO_FOUND;
+    if (hid_prox_read(uid, g_timeout_readem_ms) == 1) {
+        ret = STATUS_LF_TAG_OK;
+    }
+    return ret;
+}
+
+/**
 * Check whether there is a specified UID tag on the current field
 */
 uint8_t check_write_ok(uint8_t *uid, uint8_t *newuid, uint8_t on_uid_diff_return) {
@@ -34,6 +45,10 @@ uint8_t check_write_ok(uint8_t *uid, uint8_t *newuid, uint8_t on_uid_diff_return
     // If the data I read is incorrect, it means that the writing fails
     if (PcdScanEM410X(newuid) != STATUS_LF_TAG_OK) {
         return STATUS_EM410X_TAG_NO_FOUND;
+    }
+
+    if (PcdScanHIDProx(newuid) != STATUS_LF_TAG_OK) {
+        return STATUS_HIDPROX_TAG_NO_FOUND;
     }
     // If you read the card number the same
     // Explanation is successful (maybe)

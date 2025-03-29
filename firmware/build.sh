@@ -28,12 +28,12 @@ rm -rf "objects"
 
 (
   cd bootloader
-  make -j
+  time make -j
 )
 
 (
   cd application
-  make -j
+  time make -j
 )
 
 (

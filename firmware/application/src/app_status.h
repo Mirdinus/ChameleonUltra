@@ -22,6 +22,7 @@
 #define     STATUS_EM410X_TAG_NO_FOUND              (0x41)  // Can't search for valid EM410X tags
 #define     STATUS_HIDPROX_TAG_NO_FOUND             (0x42)  // Can't search for valid HID Prox tags
 
+
 /////////////////////////////////////////////////////////////////////
 // other status
 /////////////////////////////////////////////////////////////////////

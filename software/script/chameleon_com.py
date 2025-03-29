@@ -385,7 +385,7 @@ class ChameleonCom:
 
 if __name__ == '__main__':
     try:
-        cml = ChameleonCom().open('com19')
+        cml = ChameleonCom().open('com3')
     except OpenFailException:
         cml = ChameleonCom().open('/dev/ttyACM0')
     resp = cml.send_cmd_sync(0x03E8, None, 0)
